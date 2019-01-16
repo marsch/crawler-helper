@@ -1,0 +1,26 @@
+{
+  "name": "electron-crawler-service",
+  "version": "1.0.0",
+  "description": "Crawler Service heavily inspired by the electron-render-service",
+  "main": "index.js",
+  "author": "Mario Scheliga",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron src/main.js"
+  },
+  "dependencies": {
+    "async": "^2.6.1",
+    "babel-plugin-transform-decorators-legacy": "^1.3.5",
+    "babel-preset-es2016-node5": "^1.1.2",
+    "babel-preset-stage-0": "^6.24.1",
+    "body-parser": "^1.18.3",
+    "dotenv": "^6.2.0",
+    "electron-prebuilt-compile": "^3.0.10",
+    "express": "^4.16.4"
+  },
+  "devDependencies": {
+    "babel-eslint": "^10.0.1",
+    "eslint": "^5.10.0"
+  }
+}

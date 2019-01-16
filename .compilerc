@@ -1,0 +1,18 @@
+{
+  "env": {
+    "development": {
+      "application/javascript": {
+        "presets": ["es2016-node5", "stage-0"],
+        "plugins": ["transform-class-properties", "transform-decorators-legacy"],
+        "sourceMaps": "inline"
+      }
+    },
+    "production": {
+      "application/javascript": {
+        "presets": ["es2016-node5", "stage-0"],
+        "plugins": ["transform-class-properties", "transform-decorators-legacy"],
+        "sourceMaps": false
+      }
+    }
+  }
+}
