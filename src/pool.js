@@ -123,107 +123,118 @@ const renderImage = (window, params, done) => {
 
 
 class WindowPool {
-    windowPool = {}
+  windowPool = {}
 
-    constructor() {
-      const concurrency = parseInt(process.env.CONCURRENCY, 10) || 10
-      this.windowPool = {}
-      this.createPool(concurrency)
-      this.queue = queue(this.queueWorker, concurrency)
+  constructor() {
+    const concurrency = parseInt(process.env.CONCURRENCY, 10) || 10
+    this.windowPool = {}
+    this.createPool(concurrency)
+    this.queue = queue(this.queueWorker, concurrency)
+  }
+
+  enqueue(...args) {
+    this.queue.push(...args)
+  }
+
+  setBusy = (id, value) => {
+    this.windowPool[id].busy = value
+  }
+
+  getAvailableWindow(task) {
+    const availableId = Object.keys(this.windowPool)
+      .filter(id => this.windowPool[id].busy === false)[0]
+
+    if (!availableId) return null
+    let window = this.windowPool[availableId]
+    if (!task.webPreferences) {
+      return window
     }
 
-    enqueue(...args) {
-      this.queue.push(...args)
-    }
+    // if webpreferences, spawn a new one
+    window.destroy()
+    delete this.windowPool[availableId]
 
-    setBusy = (id, value) => {
-      this.windowPool[id].busy = value
-    }
+    window = createWindow(task.webPreferences)
+    // Basic locking
+    window.busy = false
+    window.unlock = () => { this.setBusy(window.id, false) }
+    window.lock = () => { this.setBusy(window.id, true) }
 
-    getAvailableWindow(task) {
-      const availableId = Object.keys(this.windowPool)
-        .filter(id => this.windowPool[id].busy === false)[0]
+    this.windowPool[window.id] = window
+    return this.windowPool[window.id]
+  }
 
-      if (!availableId) return null
-      let window = this.windowPool[availableId]
-      if (!task.webPreferences) {
-        return window
-      }
+  createPool(concurrency) {
+    let n = concurrency
 
-      // if webpreferences, spawn a new one
-      window.destroy()
-      delete this.windowPool[availableId]
+    while (n-- > 0) {
+      const window = createWindow({})
 
-      window = createWindow(task.webPreferences)
       // Basic locking
       window.busy = false
       window.unlock = () => { this.setBusy(window.id, false) }
       window.lock = () => { this.setBusy(window.id, true) }
 
+      // Add to pool
       this.windowPool[window.id] = window
-      return this.windowPool[window.id]
     }
+  }
 
-    createPool(concurrency) {
-      let n = concurrency
+  queueWorker = (task, done) => {
+    const window = this.getAvailableWindow(task)
+    if (!window) throw new Error('Pool is empty while queue is not saturated!?')
+    window.lock()
 
-      while (n-- > 0) {
-        const window = createWindow({})
+    const { webContents } = window
 
-        // Basic locking
-        window.busy = false
-        window.unlock = () => { this.setBusy(window.id, false) }
-        window.lock = () => { this.setBusy(window.id, true) }
 
-        // Add to pool
-        this.windowPool[window.id] = window
-      }
+
+    const TIMEOUT = task.timeout || process.env.TIMEOUT || 5000
+    const timeoutTimer = setTimeout(() => webContents.emit('timeout'), TIMEOUT)
+
+    webContents.once('finished', (type, ...args) => {
+      clearTimeout(timeoutTimer)
+      validateResult(task.url, type, ...args)
+        .then(() => {
+          switch (task.type) {
+          case 'html':
+            renderHtml(window, task, done)
+            break
+          case 'png':
+            renderImage(window, task, done)
+            break
+          }
+        })
+        .catch((e) => {
+          window.unlock()
+          done(e)
+        })
+    })
+
+    const headers = { ...DEFAULT_HEADERS, ...task.headers }
+    const extraHeaders = Object.keys(headers).map((n) => {
+      return `${n}: ${headers[n]}`
+    }).join('\n')
+
+
+
+    let proxyRules = task.proxyRules || process.env.PROXY_RULES
+    if (task.proxyRules == '') {
+      proxyRules = false
     }
-
-    queueWorker = (task, done) => {
-      const window = this.getAvailableWindow(task)
-      if (!window) throw new Error('Pool is empty while queue is not saturated!?')
-      window.lock()
-
-      const { webContents } = window
-
-      let proxyRules = task.proxyRules || process.env.PROXY_RULES
-      if (task.proxyRules == '') {
-        proxyRules = false
-      }
-      if (proxyRules) {
-        webContents.session.setProxy({ proxyRules: proxyRules }, () => { })
-      }
-
-      const TIMEOUT = task.timeout || process.env.TIMEOUT || 5000
-      const timeoutTimer = setTimeout(() => webContents.emit('timeout'), TIMEOUT)
-
-      webContents.once('finished', (type, ...args) => {
-        clearTimeout(timeoutTimer)
-        validateResult(task.url, type, ...args)
-          .then(() => {
-            switch (task.type) {
-            case 'html':
-              renderHtml(window, task, done)
-              break
-            case 'png':
-              renderImage(window, task, done)
-              break
-            }
-          })
-          .catch((e) => {
-            window.unlock()
-            done(e)
-          })
+    if (proxyRules) {
+      console.log(`setting proxy:${proxyRules}`)
+      webContents.session.setProxy({ proxyRules: proxyRules }, () => {
+        console.log('proxy was sat')
+        console.log(`loading ....${task.url}`)
+        webContents.loadURL(task.url, { extraHeaders })
       })
-
-      const headers = { ...DEFAULT_HEADERS, ...task.headers }
-      const extraHeaders = Object.keys(headers).map((n) => {
-        return `${n}: ${headers[n]}`
-      }).join('\n')
-
+    } else {
+      console.log(`loading ....${task.url}`)
       webContents.loadURL(task.url, { extraHeaders })
     }
+
+  }
 }
 
 module.exports = WindowPool
