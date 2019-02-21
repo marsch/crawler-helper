@@ -18,7 +18,9 @@ app.post('/html', (req, res) => {
   const task = { type: 'html', ...req.body }
   req.app.pool.enqueue(task, (err, buffer) => {
     if (err) {
-      res.json({ error: err.toString() })
+      res.status(510)
+      console.log(err)
+      res.json({ type: err.type, code: err.code, name: err.name, message: err.message })
       return
     }
     res.type('html').send(buffer)

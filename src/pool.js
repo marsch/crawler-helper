@@ -7,6 +7,8 @@ const WINDOW_WIDTH = parseInt(process.env.WINDOW_WIDTH, 10) || 1024
 const WINDOW_HEIGHT = parseInt(process.env.WINDOW_HEIGHT, 10) || 768
 const USER_AGENT = process.env.USER_AGENT || 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.110 Safari/537.36'
 const DEFAULT_HEADERS = { 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' }
+const chromiumNetErrors = require('chromium-net-errors')
+
 
 const createWindow = (userWebPreferences = {}) => {
   const defaultWebPreferences = {
@@ -42,35 +44,8 @@ const createWindow = (userWebPreferences = {}) => {
 }
 
 const handleLoadingError = (currentUrl, event, code, desc, url) => {
-  switch (code) {
-  case -102:
-    return Promise.reject(new Error(
-      'CONNECTION_REFUSED', 'Connection attempt was refused.'))
-  case -105:
-    return Promise.reject(new Error(
-      'NAME_NOT_RESOLVED', 'The host name could not be resolved.'))
-  case -137:
-    return Promise.reject(new Error(
-      'NAME_RESOLUTION_FAILED', 'Hostname resolution failed (DNS).'))
-  case -300:
-    return Promise.reject(new Error('INVALID_URL', 'The URL is invalid.'))
-  case -501:
-    return Promise.reject(new Error(
-      'INSECURE_RESPONSE', 'The server\'s response was insecure (e.g. there was a cert error).'))
-  case -6:
-    return Promise.reject(new Error(
-      'FILE_NOT_FOUND', 'The file or directory cannot be found.'))
-  case -3:
-    // Subresource fails to load, render page anyway
-    if (currentUrl !== url) {
-      process.stderr.write(`Failed to load url on page:\n${url}\n`)
-      return new Promise(resolve => event.sender.once('did-finish-load', resolve))
-    }
-
-    return Promise.reject(new Error('ABORTED', 'Page failed to load.'))
-  default:
-    return Promise.reject(new Error('GENERIC_ERROR', `${code} - ${desc}`))
-  }
+  const ErrorClass = chromiumNetErrors.getErrorByCode(code)
+  return Promise.reject(new ErrorClass())
 }
 
 const validateResult = (originalUrl, eventType, ...args) => {
@@ -111,8 +86,7 @@ const renderImage = (window, params, done) => {
   window.webContents.executeJavaScript(`
   var body = document.body,
     html = document.documentElement
-
-  Math.max( body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight )
+    Math.max( body.scrollHeight, body.offsetHeight, html.clientHeight, html.scrollHeight, html.offsetHeight )
 `).then((height) => {
     window.setSize(WINDOW_WIDTH, height)
     setTimeout(() => window.capturePage(handleCapture), 50)
@@ -186,7 +160,6 @@ class WindowPool {
     window.lock()
 
     const { webContents } = window
-
 
 
     const TIMEOUT = task.timeout || process.env.TIMEOUT || 5000

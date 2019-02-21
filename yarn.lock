@@ -1350,6 +1350,11 @@ cheerio@^0.20.0:
   optionalDependencies:
     jsdom "^7.0.2"
 
+chromium-net-errors@^4.1.0:
+  version "4.1.0"
+  resolved "https://registry.yarnpkg.com/chromium-net-errors/-/chromium-net-errors-4.1.0.tgz#237fe407ffcd4ebd110afdfb21c4bb36b7bc6b66"
+  integrity sha512-q/x8r0XmSN25e/KYgp7QNgQCHxXLKIEFCBeVmeRSeBdbrn/lcxyvFjf0D8mk+gHb+ZYFDqIZuIFqrXhHzdmBOw==
+
 circular-json@^0.3.1:
   version "0.3.3"
   resolved "https://registry.yarnpkg.com/circular-json/-/circular-json-0.3.3.tgz#815c99ea84f6809529d2f45791bdf82711352d66"
